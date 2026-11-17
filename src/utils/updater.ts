@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.0.2';
 const GITHUB_LATEST_RELEASE_API =
   'https://api.github.com/repos/scaevola1981/calculator-salariu-Dora/releases/latest';
 

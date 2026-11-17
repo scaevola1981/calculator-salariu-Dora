@@ -340,7 +340,7 @@ export const Dashboard: React.FC = () => {
                     className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]"
                   >
                     <div className="flex items-center gap-1.5 min-w-[115px]">
-                      <span className="font-mono-num font-bold text-slate-200">
+                      <span className="font-mono-num font-bold text-[#2686F3]">
                         {String(bar.day).padStart(2, '0')} {MONTH_NAMES_SHORT_RO[currentMonthIdx]}
                       </span>
                       <span className="text-[11px] text-slate-400">
