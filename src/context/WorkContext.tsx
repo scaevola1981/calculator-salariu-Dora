@@ -45,7 +45,7 @@ interface WorkContextType {
   selectedMonthKey: string;
   updateDayMinutes: (dateKey: string, totalMinutes: number) => void;
   setDayLeave: (dateKey: string, isLeave: boolean, totalMinutes?: number) => void;
-  addManualSession: (dateKey: string, durationMinutes: number, note?: string) => void;
+  addManualSession: (dateKey: string, durationMinutes: number, note?: string, startTs?: number, endTs?: number) => void;
   deleteSession: (dateKey: string, sessionId: string) => void;
   clearDayLog: (dateKey: string) => void;
   // Computed stats for selected month
@@ -363,38 +363,45 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [updateWorkLogs]);
 
   // Add manual session
-  const addManualSession = useCallback((dateKey: string, durationMinutes: number, note?: string) => {
-    if (durationMinutes <= 0) return;
-    updateWorkLogs((prev) => {
-      const existing = prev[dateKey] || {
-        date: dateKey,
-        totalMinutes: 0,
-        sessions: [],
-      };
-
-      const newSession: WorkSession = {
-        id: `manual_${Date.now()}`,
-        start: Date.now() - durationMinutes * 60000,
-        end: Date.now(),
-        durationMinutes,
-        note: note || 'Adăugat manual',
-        manual: true,
-      };
-
-      const updatedSessions = [...existing.sessions, newSession];
-      const newTotal = updatedSessions.reduce((acc, s) => acc + s.durationMinutes, 0);
-
-      return {
-        ...prev,
-        [dateKey]: {
+  const addManualSession = useCallback(
+    (dateKey: string, durationMinutes: number, note?: string, startTs?: number, endTs?: number) => {
+      if (durationMinutes <= 0) return;
+      updateWorkLogs((prev) => {
+        const existing = prev[dateKey] || {
           date: dateKey,
-          totalMinutes: newTotal,
-          sessions: updatedSessions,
-        },
-      };
-    });
-    triggerHaptic('medium');
-  }, [updateWorkLogs]);
+          totalMinutes: 0,
+          sessions: [],
+        };
+
+        const resolvedEnd = endTs ?? Date.now();
+        const resolvedStart = startTs ?? resolvedEnd - durationMinutes * 60000;
+
+        const newSession: WorkSession = {
+          id: `manual_${Date.now()}`,
+          start: resolvedStart,
+          end: resolvedEnd,
+          durationMinutes,
+          note: note || 'Pontaj manual',
+          manual: true,
+        };
+
+        const updatedSessions = [...existing.sessions, newSession];
+        const newTotal = updatedSessions.reduce((acc, s) => acc + s.durationMinutes, 0);
+
+        return {
+          ...prev,
+          [dateKey]: {
+            date: dateKey,
+            totalMinutes: newTotal,
+            sessions: updatedSessions,
+            isLeave: existing.isLeave,
+          },
+        };
+      });
+      triggerHaptic('medium');
+    },
+    [updateWorkLogs]
+  );
 
   // Delete a session
   const deleteSession = useCallback((dateKey: string, sessionId: string) => {

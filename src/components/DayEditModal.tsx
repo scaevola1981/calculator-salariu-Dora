@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useWork } from '../context/WorkContext';
 import {
   formatMinutesToHM,
@@ -11,6 +11,7 @@ import {
   Check,
   Calendar,
   Palmtree,
+  Clock,
 } from 'lucide-react';
 
 interface DayEditModalProps {
@@ -19,25 +20,39 @@ interface DayEditModalProps {
 }
 
 export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) => {
-  const { workLogs, updateDayMinutes, addManualSession, setDayLeave, deleteSession, clearDayLog, hourlyRate } =
+  const { workLogs, addManualSession, setDayLeave, deleteSession, clearDayLog, hourlyRate } =
     useWork();
 
-  const [hoursInput, setHoursInput] = useState<string>('8');
-  const [minutesInput, setMinutesInput] = useState<string>('0');
-  const [noteInput, setNoteInput] = useState<string>('');
+  const [entryTime, setEntryTime] = useState<string>('08:00');
+  const [exitTime, setExitTime] = useState<string>('16:00');
 
   const dayLog = dateKey ? workLogs[dateKey] : null;
   const currentTotalMinutes = dayLog ? dayLog.totalMinutes : 0;
 
-  useEffect(() => {
-    if (dayLog && dayLog.totalMinutes > 0) {
-      setHoursInput(String(Math.floor(dayLog.totalMinutes / 60)));
-      setMinutesInput(String(Math.round(dayLog.totalMinutes % 60)));
-    } else {
-      setHoursInput('8');
-      setMinutesInput('0');
+  // Calculate minutes automatically from entryTime & exitTime
+  const { calculatedMinutes, startTs, endTs } = useMemo(() => {
+    if (!dateKey || !entryTime || !exitTime) {
+      return { calculatedMinutes: 0, startTs: 0, endTs: 0 };
     }
-  }, [dayLog, dateKey]);
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const [inH, inM] = entryTime.split(':').map(Number);
+    const [outH, outM] = exitTime.split(':').map(Number);
+
+    const startDate = new Date(y, m - 1, d, inH || 0, inM || 0, 0, 0);
+    const endDate = new Date(y, m - 1, d, outH || 0, outM || 0, 0, 0);
+
+    // Handle overnight shifts (e.g. 22:00 -> 06:00)
+    if (endDate.getTime() <= startDate.getTime()) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+
+    const diffMins = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    return {
+      calculatedMinutes: Math.max(0, diffMins),
+      startTs: startDate.getTime(),
+      endTs: endDate.getTime(),
+    };
+  }, [dateKey, entryTime, exitTime]);
 
   if (!dateKey) return null;
 
@@ -51,27 +66,10 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) 
   ];
   const dateFormatted = `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[m - 1]} ${y}`;
 
-  const handleSaveDirect = () => {
-    const h = parseInt(hoursInput, 10) || 0;
-    const min = parseInt(minutesInput, 10) || 0;
-    const total = Math.max(0, h * 60 + min);
-    updateDayMinutes(dateKey, total);
+  const handleSaveEntryExit = () => {
+    if (calculatedMinutes <= 0) return;
+    addManualSession(dateKey, calculatedMinutes, 'Pontaj manual', startTs, endTs);
     onClose();
-  };
-
-  const handleQuickAdd = (additionalMinutes: number) => {
-    addManualSession(
-      dateKey,
-      additionalMinutes,
-      noteInput.trim() ? noteInput.trim() : `Adăugare manuală (+${additionalMinutes}m)`
-    );
-    setNoteInput('');
-  };
-
-  const handleSetExact = (minutes: number) => {
-    updateDayMinutes(dateKey, minutes);
-    setHoursInput(String(Math.floor(minutes / 60)));
-    setMinutesInput(String(minutes % 60));
   };
 
   const handleClear = () => {
@@ -126,130 +124,97 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) 
           </div>
         </div>
 
-        {/* Manual adjustment section */}
+        {/* Ora de intrare & Ora de iesire */}
         <div className="mt-4 flex flex-col gap-3">
           <label className="text-xs font-bold text-slate-300 block">
-            Setează totalul de ore pentru această zi:
+            Introdu intervalul lucrat (intrare - ieșire):
           </label>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] text-slate-400">Ore</span>
+              <span className="text-[11px] font-semibold text-slate-400">Ora de intrare</span>
               <input
-                type="number"
-                min="0"
-                max="24"
-                value={hoursInput}
-                onChange={(e) => setHoursInput(e.target.value)}
-                className="neo-input-inset text-center py-2"
-                placeholder="Ore"
+                type="time"
+                value={entryTime}
+                onChange={(e) => setEntryTime(e.target.value)}
+                className="neo-input-inset text-center py-2.5 w-full"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] text-slate-400">Minute</span>
+              <span className="text-[11px] font-semibold text-slate-400">Ora de ieșire</span>
               <input
-                type="number"
-                min="0"
-                max="59"
-                step="5"
-                value={minutesInput}
-                onChange={(e) => setMinutesInput(e.target.value)}
-                className="neo-input-inset text-center py-2"
-                placeholder="Minute"
+                type="time"
+                value={exitTime}
+                onChange={(e) => setExitTime(e.target.value)}
+                className="neo-input-inset text-center py-2.5 w-full"
               />
             </div>
           </div>
 
-          {/* Quick presets buttons */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleSetExact(480)}
-              className="glass-pill px-3 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/20 transition-all border border-sky-400/30"
-            >
-              8h (Normă întreagă)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetExact(240)}
-              className="glass-pill px-3 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/20 transition-all border border-sky-400/30"
-            >
-              4h (Jumătate de normă)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetExact(600)}
-              className="glass-pill px-3 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/20 transition-all border border-sky-400/30"
-            >
-              10h (Tură lungă)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetExact(720)}
-              className="glass-pill px-3 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/20 transition-all border border-sky-400/30"
-            >
-              12h (Tură 12h)
-            </button>
-          </div>
-
-          {/* Leave / Concediu Section */}
-          <div className="pt-2 border-t border-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <Palmtree size={14} />
-                Zile de Concediu (CO)
+          {/* Live Calculated Duration Preview */}
+          <div className="glass-pill px-3.5 py-2 flex items-center justify-between text-xs border border-[#2686F3]/30">
+            <span className="flex items-center gap-1.5 font-semibold text-slate-300">
+              <Clock size={14} className="text-[#2686F3]" />
+              Calcul automat:
+            </span>
+            <div className="flex items-center gap-2.5 font-mono-num font-extrabold">
+              <span className="text-[#2686F3]">{formatMinutesToHM(calculatedMinutes)}</span>
+              <span className="text-emerald-400">
+                (+{formatMoney((calculatedMinutes / 60) * hourlyRate)})
               </span>
-              {dayLog?.isLeave && (
-                <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                  Marcat ca Concediu
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => {
-                  setDayLeave(dateKey, true, 480);
-                  onClose();
-                }}
-                className="flex-1 glass-pill px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition-all border border-amber-400/30"
-              >
-                Concediu Plătit (8h)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDayLeave(dateKey, true, 0);
-                  onClose();
-                }}
-                className="flex-1 glass-pill px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition-all border border-amber-400/30"
-              >
-                Concediu (0h)
-              </button>
-              {dayLog?.isLeave && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDayLeave(dateKey, false);
-                    onClose();
-                  }}
-                  className="w-full glass-pill px-3 py-1.5 text-[11px] font-bold text-rose-400 hover:bg-rose-500/15 transition-all border border-rose-400/30"
-                >
-                  Anulează statutul de Concediu
-                </button>
-              )}
             </div>
           </div>
 
           {/* Save button */}
           <button
             type="button"
-            onClick={handleSaveDirect}
-            className="neo-button w-full py-3.5 mt-2 bg-gradient-to-r from-sky-500 to-blue-600 font-bold text-sm text-white shadow-lg flex items-center justify-center gap-2"
+            onClick={handleSaveEntryExit}
+            disabled={calculatedMinutes <= 0}
+            className="neo-button w-full py-3.5 font-bold text-sm text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Check size={18} />
             Salvează Orele Zilei
           </button>
+
+          {/* Leave / Concediu Section (Blue font) */}
+          <div className="pt-2.5 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-[#2686F3] flex items-center gap-1.5">
+                <Palmtree size={14} />
+                Zile de Concediu (CO)
+              </span>
+              {dayLog?.isLeave && (
+                <span className="text-[10px] font-bold bg-[#2686F3]/15 text-[#2686F3] border border-[#2686F3]/35 px-2 py-0.5 rounded-full">
+                  Marcat ca Concediu
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {!dayLog?.isLeave ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDayLeave(dateKey, true, 0);
+                    onClose();
+                  }}
+                  className="w-full glass-pill px-3 py-2.5 text-xs font-bold text-[#2686F3] hover:bg-[#2686F3]/15 transition-all border border-[#2686F3]/35"
+                >
+                  Marchează ca Zi de Concediu (CO)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDayLeave(dateKey, false);
+                    onClose();
+                  }}
+                  className="w-full glass-pill px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/15 transition-all border border-rose-400/30"
+                >
+                  Anulează statutul de Concediu
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Existing sessions list */}
@@ -277,7 +242,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) 
                 >
                   <div className="flex flex-col">
                     <span className="font-semibold text-slate-200">
-                      {session.note || (session.manual ? 'Adăugare manuală' : 'Tură cronometrată')}
+                      {session.note || (session.manual ? 'Pontaj manual' : 'Tură cronometrată')}
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono-num">
                       {formatTimeOnly(session.start)} - {formatTimeOnly(session.end)}
@@ -306,4 +271,3 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) 
     </div>
   );
 };
-
