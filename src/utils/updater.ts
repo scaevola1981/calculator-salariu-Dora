@@ -1,6 +1,6 @@
 import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
 
-export const APP_VERSION = '1.0.4';
+export const APP_VERSION = '1.0.5';
 const GITHUB_LATEST_RELEASE_API =
   'https://api.github.com/repos/scaevola1981/calculator-salariu-Dora/releases/latest';
 
@@ -53,6 +53,7 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
 
     const response = await fetch(GITHUB_LATEST_RELEASE_API, {
       signal: controller.signal,
+      cache: 'no-store',
       headers: {
         Accept: 'application/vnd.github.v3+json',
       },

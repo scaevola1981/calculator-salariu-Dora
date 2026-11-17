@@ -20,7 +20,8 @@ android/local.properties
 android/.idea/
 *.iml
 
-# Keystores (nu urca cheile private pe GitHub public)
+# Keystores (nu urca cheile private de release pe GitHub public)
 *.jks
 *.keystore
+!android/app/debug.keystore
 
