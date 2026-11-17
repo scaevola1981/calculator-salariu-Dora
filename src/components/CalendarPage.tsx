@@ -7,6 +7,7 @@ import {
   formatDateKey,
 } from '../utils/timeFormat';
 import { DayEditModal } from './DayEditModal';
+import { UpdateModal } from './UpdateModal';
 import {
   Coins,
   ChevronLeft,
@@ -39,14 +40,18 @@ export const CalendarPage: React.FC = () => {
   } = useWork();
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
   const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
 
   const handleUpdateButtonClick = async () => {
     if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
-      window.open(updateInfo.downloadUrl, '_system');
+      setShowUpdateModal(true);
       return;
     }
-    await recheckUpdate();
+    const info = await recheckUpdate();
+    if (info?.hasUpdate && info.downloadUrl) {
+      setShowUpdateModal(true);
+    }
   };
 
   // Sync rate input if external change
@@ -390,6 +395,14 @@ export const CalendarPage: React.FC = () => {
         <DayEditModal
           dateKey={selectedDayKey}
           onClose={() => setSelectedDayKey(null)}
+        />
+      )}
+
+      {/* In-App Update Modal */}
+      {showUpdateModal && updateInfo?.hasUpdate && (
+        <UpdateModal
+          updateInfo={updateInfo}
+          onClose={() => setShowUpdateModal(false)}
         />
       )}
     </div>

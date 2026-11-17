@@ -1,6 +1,19 @@
-export const APP_VERSION = '1.0.2';
+import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
+
+export const APP_VERSION = '1.0.3';
 const GITHUB_LATEST_RELEASE_API =
   'https://api.github.com/repos/scaevola1981/calculator-salariu-Dora/releases/latest';
+
+export interface AppUpdaterPlugin {
+  downloadAndInstall(options: { url: string }): Promise<{ installed?: boolean; needsPermission?: boolean }>;
+  installCachedApk(): Promise<{ installed?: boolean; needsPermission?: boolean }>;
+  addListener(
+    eventName: 'downloadProgress',
+    listenerFunc: (data: { progress: number }) => void
+  ): Promise<PluginListenerHandle>;
+}
+
+export const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 
 export interface UpdateInfo {
   hasUpdate: boolean;
