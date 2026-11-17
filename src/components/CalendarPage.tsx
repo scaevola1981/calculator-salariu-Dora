@@ -16,8 +16,9 @@ import {
   Sun,
   Moon,
   RefreshCw,
+  Download,
 } from 'lucide-react';
-import { APP_VERSION, checkForAppUpdate } from '../utils/updater';
+import { APP_VERSION } from '../utils/updater';
 
 export const CalendarPage: React.FC = () => {
   const {
@@ -32,30 +33,20 @@ export const CalendarPage: React.FC = () => {
     daysWorkedMonth,
     theme,
     toggleTheme,
+    updateInfo,
+    checkingUpdate,
+    recheckUpdate,
   } = useWork();
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
-  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
-  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
-  const [availableDownloadUrl, setAvailableDownloadUrl] = useState<string | null>(null);
 
-  const handleCheckUpdate = async () => {
-    setCheckingUpdate(true);
-    setUpdateMsg(null);
-    const info = await checkForAppUpdate();
-    setCheckingUpdate(false);
-    if (!info) {
-      setUpdateMsg('Fără conexiune sau nu există release-uri');
+  const handleUpdateButtonClick = async () => {
+    if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
+      window.open(updateInfo.downloadUrl, '_system');
       return;
     }
-    if (info.hasUpdate) {
-      setUpdateMsg(`Disponibil v${info.latestVersion}!`);
-      setAvailableDownloadUrl(info.downloadUrl);
-    } else {
-      setUpdateMsg('Aplicația este la zi');
-      setAvailableDownloadUrl(null);
-    }
+    await recheckUpdate();
   };
 
   // Sync rate input if external change
@@ -131,20 +122,53 @@ export const CalendarPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 pb-28">
-      {/* Page Title & Theme Toggle */}
-      <div className="pt-1 flex items-center justify-between">
+      {/* Page Title & Header Controls */}
+      <div className="pt-1 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-white tracking-tight">
           Calendar & Tarif Orar
         </h1>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Schimbă la tema albă' : 'Schimbă la tema întunecată'}
-          title={theme === 'dark' ? 'Temă Albă' : 'Temă Întunecată'}
-          className="glass-pill w-9 h-9 flex items-center justify-center border border-white/10 text-amber-300 hover:scale-105 active:scale-95 transition-all"
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} className="text-sky-600" />}
-        </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={handleUpdateButtonClick}
+            disabled={checkingUpdate}
+            aria-label={
+              updateInfo?.hasUpdate
+                ? `Update nou v${updateInfo.latestVersion} disponibil`
+                : `Verifică update (v${APP_VERSION})`
+            }
+            title={
+              updateInfo?.hasUpdate
+                ? `Update nou v${updateInfo.latestVersion}! Apasă pentru actualizare`
+                : `Verifică update (v${APP_VERSION})`
+            }
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+              updateInfo?.hasUpdate
+                ? 'bg-[#2686F3] text-white border border-[#79BEEE]/70 shadow-[0_0_14px_rgba(38,134,243,0.75)] hover:scale-105'
+                : 'glass-pill border border-white/10 text-slate-400 hover:scale-105'
+            }`}
+          >
+            {updateInfo?.hasUpdate ? (
+              <>
+                <Download size={16} />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-white" />
+              </>
+            ) : (
+              <RefreshCw size={15} className={checkingUpdate ? 'animate-spin text-[#2686F3]' : ''} />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Schimbă la tema albă' : 'Schimbă la tema întunecată'}
+            title={theme === 'dark' ? 'Temă Albă' : 'Temă Întunecată'}
+            className="glass-pill w-9 h-9 flex items-center justify-center border border-white/10 text-amber-300 hover:scale-105 active:scale-95 transition-all"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} className="text-sky-600" />}
+          </button>
+        </div>
       </div>
 
       {/* SECTION 1: Tarif Orar Input Card */}
@@ -358,37 +382,6 @@ export const CalendarPage: React.FC = () => {
           <span className="text-base font-extrabold text-emerald-400 font-mono-num">
             {formatMoney(totalMoneyMonth)}
           </span>
-        </div>
-      </div>
-
-      {/* Version & Manual Update Check */}
-      <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
-        <span className="font-mono-num">v{APP_VERSION}</span>
-        <div className="flex items-center gap-2">
-          {updateMsg && (
-            <span className={availableDownloadUrl ? 'text-sky-300 font-bold' : ''}>
-              {updateMsg}
-            </span>
-          )}
-          {availableDownloadUrl ? (
-            <button
-              type="button"
-              onClick={() => window.open(availableDownloadUrl, '_system')}
-              className="neo-button px-2.5 py-1 text-[11px] font-bold text-white rounded-lg"
-            >
-              Actualizează
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleCheckUpdate}
-              disabled={checkingUpdate}
-              className="glass-pill px-2.5 py-1 flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:opacity-80 active:scale-95 transition-all"
-            >
-              <RefreshCw size={11} className={checkingUpdate ? 'animate-spin' : ''} />
-              <span>{checkingUpdate ? 'Se verifică...' : 'Verifică update'}</span>
-            </button>
-          )}
         </div>
       </div>
 

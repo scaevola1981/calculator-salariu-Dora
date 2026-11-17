@@ -19,6 +19,7 @@ import {
   getActiveMonthKeys,
 } from '../utils/timeFormat';
 import { triggerHaptic } from '../utils/haptics';
+import { checkForAppUpdate, UpdateInfo } from '../utils/updater';
 
 interface DailyBarData {
   day: number;
@@ -60,6 +61,10 @@ interface WorkContextType {
   setUserName: (name: string) => void;
   isOnboarded: boolean;
   completeOnboarding: (name: string, rate: number) => void;
+  // App Updater
+  updateInfo: UpdateInfo | null;
+  checkingUpdate: boolean;
+  recheckUpdate: () => Promise<UpdateInfo | null>;
 }
 
 const WorkContext = createContext<WorkContextType | undefined>(undefined);
@@ -75,6 +80,22 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedMonth, setSelectedMonth] = useState<MonthViewType>('current');
   const [userName, setUserNameState] = useState<string>(() => loadUserName());
   const [isOnboarded, setIsOnboarded] = useState<boolean>(() => loadOnboarded());
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+
+  const recheckUpdate = useCallback(async () => {
+    setCheckingUpdate(true);
+    const info = await checkForAppUpdate();
+    setCheckingUpdate(false);
+    if (info) {
+      setUpdateInfo(info);
+    }
+    return info;
+  }, []);
+
+  useEffect(() => {
+    recheckUpdate();
+  }, [recheckUpdate]);
 
   const setUserName = useCallback((name: string) => {
     setUserNameState(name);
@@ -496,6 +517,9 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserName,
     isOnboarded,
     completeOnboarding,
+    updateInfo,
+    checkingUpdate,
+    recheckUpdate,
   };
 
   return <WorkContext.Provider value={value}>{children}</WorkContext.Provider>;
