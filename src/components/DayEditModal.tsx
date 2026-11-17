@@ -291,9 +291,10 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({ dateKey, onClose }) 
                     <button
                       type="button"
                       onClick={() => deleteSession(dateKey, session.id)}
-                      className="p-1 rounded-full text-slate-400 hover:text-rose-400"
+                      aria-label="Șterge înregistrarea"
+                      className="w-9 h-9 rounded-xl bg-rose-500 !text-white shadow-[0_3px_10px_rgba(244,63,94,0.4)] flex items-center justify-center active:scale-90 transition-all flex-shrink-0"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
