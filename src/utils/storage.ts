@@ -5,6 +5,8 @@ const STORAGE_KEYS = {
   HOURLY_RATE: 'dora_hourly_rate',
   WORK_LOGS: 'dora_work_logs',
   ACTIVE_SHIFT: 'dora_active_shift',
+  USER_NAME: 'dora_user_name',
+  ONBOARDED: 'dora_onboarded',
 };
 
 /**
@@ -117,6 +119,38 @@ export function saveActiveShift(shift: ActiveShift | null): void {
     }
   } catch (err) {
     console.error('Error saving active shift:', err);
+  }
+}
+
+export function loadUserName(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.USER_NAME) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveUserName(name: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.USER_NAME, name);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadOnboarded(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.ONBOARDED) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveOnboarded(val: boolean): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ONBOARDED, val ? 'true' : 'false');
+  } catch {
+    // ignore
   }
 }
 

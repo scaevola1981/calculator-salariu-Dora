@@ -8,6 +8,10 @@ import {
   loadActiveShift,
   saveActiveShift,
   cleanOldLogs,
+  loadUserName,
+  saveUserName,
+  loadOnboarded,
+  saveOnboarded,
 } from '../utils/storage';
 import {
   formatDateKey,
@@ -51,6 +55,11 @@ interface WorkContextType {
   // Theme
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  // User & Onboarding
+  userName: string;
+  setUserName: (name: string) => void;
+  isOnboarded: boolean;
+  completeOnboarding: (name: string, rate: number) => void;
 }
 
 const WorkContext = createContext<WorkContextType | undefined>(undefined);
@@ -64,6 +73,25 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return shift && shift.isRunning ? Math.max(0, Date.now() - shift.startTime) : 0;
   });
   const [selectedMonth, setSelectedMonth] = useState<MonthViewType>('current');
+  const [userName, setUserNameState] = useState<string>(() => loadUserName());
+  const [isOnboarded, setIsOnboarded] = useState<boolean>(() => loadOnboarded());
+
+  const setUserName = useCallback((name: string) => {
+    setUserNameState(name);
+    saveUserName(name);
+  }, []);
+
+  const completeOnboarding = useCallback((name: string, rate: number) => {
+    const cleanName = name.trim();
+    setUserNameState(cleanName);
+    saveUserName(cleanName);
+    const validRate = isNaN(rate) || rate < 0 ? 0 : rate;
+    setHourlyRateState(validRate);
+    saveHourlyRate(validRate);
+    setIsOnboarded(true);
+    saveOnboarded(true);
+    triggerHaptic('success');
+  }, []);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
       const saved = localStorage.getItem('dora_theme');
@@ -464,6 +492,10 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dailyBarsData,
     theme,
     toggleTheme,
+    userName,
+    setUserName,
+    isOnboarded,
+    completeOnboarding,
   };
 
   return <WorkContext.Provider value={value}>{children}</WorkContext.Provider>;

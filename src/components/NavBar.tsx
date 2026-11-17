@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWork } from '../context/WorkContext';
 import { BarChart3, Calendar, Play, Square } from 'lucide-react';
 import { formatElapsedMs } from '../utils/timeFormat';
@@ -6,23 +6,47 @@ import { formatElapsedMs } from '../utils/timeFormat';
 interface NavBarProps {
   activeTab: 'dashboard' | 'calendar';
   setActiveTab: (tab: 'dashboard' | 'calendar') => void;
+  onShiftStarted?: () => void;
   onShiftStopped?: (info: { durationMinutes: number; date: string }) => void;
 }
 
-export const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, onShiftStopped }) => {
+const BURST_PARTICLES = [
+  { tx: '-38px', ty: '-42px', color: '#79BEEE' },
+  { tx: '38px', ty: '-42px', color: '#2686F3' },
+  { tx: '-50px', ty: '0px', color: '#84AFE6' },
+  { tx: '50px', ty: '0px', color: '#6C6CF0' },
+  { tx: '-30px', ty: '36px', color: '#10b981' },
+  { tx: '30px', ty: '36px', color: '#f43f5e' },
+  { tx: '0px', ty: '-54px', color: '#ffffff' },
+];
+
+export const NavBar: React.FC<NavBarProps> = ({
+  activeTab,
+  setActiveTab,
+  onShiftStarted,
+  onShiftStopped,
+}) => {
   const { activeShift, elapsedMs, startShift, stopShift } = useWork();
+  const [rippleKey, setRippleKey] = useState<number>(0);
+  const [lastAction, setLastAction] = useState<'start' | 'stop' | null>(null);
 
   const isRunning = activeShift?.isRunning;
   const time = formatElapsedMs(elapsedMs);
 
   const handleDialClick = () => {
+    setRippleKey((k) => k + 1);
     if (isRunning) {
+      setLastAction('stop');
       const res = stopShift();
       if (res && onShiftStopped) {
         onShiftStopped(res);
       }
     } else {
+      setLastAction('start');
       startShift();
+      if (onShiftStarted) {
+        onShiftStarted();
+      }
     }
   };
 
@@ -63,7 +87,28 @@ export const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, onShift
         </button>
 
         {/* Central Tactile Dial: Start / Stop Tură */}
-        <div className="shift-dial-container" style={{ marginTop: '-24px' }}>
+        <div className="shift-dial-container">
+          {rippleKey > 0 && (
+            <React.Fragment key={rippleKey}>
+              <span
+                className={lastAction === 'start' ? 'dial-ripple-start' : 'dial-ripple-stop'}
+              />
+              {BURST_PARTICLES.map((p, idx) => (
+                <span
+                  key={idx}
+                  className="burst-particle"
+                  style={
+                    {
+                      backgroundColor: p.color,
+                      '--tx': p.tx,
+                      '--ty': p.ty,
+                    } as React.CSSProperties
+                  }
+                />
+              ))}
+            </React.Fragment>
+          )}
+
           <button
             type="button"
             onClick={handleDialClick}
