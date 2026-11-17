@@ -15,7 +15,9 @@ import {
   Minus,
   Sun,
   Moon,
+  RefreshCw,
 } from 'lucide-react';
+import { APP_VERSION, checkForAppUpdate } from '../utils/updater';
 
 export const CalendarPage: React.FC = () => {
   const {
@@ -34,6 +36,27 @@ export const CalendarPage: React.FC = () => {
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+  const [availableDownloadUrl, setAvailableDownloadUrl] = useState<string | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateMsg(null);
+    const info = await checkForAppUpdate();
+    setCheckingUpdate(false);
+    if (!info) {
+      setUpdateMsg('Fără conexiune sau nu există release-uri');
+      return;
+    }
+    if (info.hasUpdate) {
+      setUpdateMsg(`Disponibil v${info.latestVersion}!`);
+      setAvailableDownloadUrl(info.downloadUrl);
+    } else {
+      setUpdateMsg('Aplicația este la zi');
+      setAvailableDownloadUrl(null);
+    }
+  };
 
   // Sync rate input if external change
   React.useEffect(() => {
@@ -335,6 +358,37 @@ export const CalendarPage: React.FC = () => {
           <span className="text-base font-extrabold text-emerald-400 font-mono-num">
             {formatMoney(totalMoneyMonth)}
           </span>
+        </div>
+      </div>
+
+      {/* Version & Manual Update Check */}
+      <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
+        <span className="font-mono-num">v{APP_VERSION}</span>
+        <div className="flex items-center gap-2">
+          {updateMsg && (
+            <span className={availableDownloadUrl ? 'text-sky-300 font-bold' : ''}>
+              {updateMsg}
+            </span>
+          )}
+          {availableDownloadUrl ? (
+            <button
+              type="button"
+              onClick={() => window.open(availableDownloadUrl, '_system')}
+              className="neo-button px-2.5 py-1 text-[11px] font-bold text-white rounded-lg"
+            >
+              Actualizează
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCheckUpdate}
+              disabled={checkingUpdate}
+              className="glass-pill px-2.5 py-1 flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:opacity-80 active:scale-95 transition-all"
+            >
+              <RefreshCw size={11} className={checkingUpdate ? 'animate-spin' : ''} />
+              <span>{checkingUpdate ? 'Se verifică...' : 'Verifică update'}</span>
+            </button>
+          )}
         </div>
       </div>
 
