@@ -142,10 +142,10 @@ export const CalendarPage: React.FC = () => {
                 ? `Update nou v${updateInfo.latestVersion}! Apasă pentru actualizare`
                 : `Verifică update (v${APP_VERSION})`
             }
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 !text-white ${
               updateInfo?.hasUpdate
-                ? 'bg-[#2686F3] text-white border border-[#79BEEE]/70 shadow-[0_0_14px_rgba(38,134,243,0.75)] hover:scale-105'
-                : 'glass-pill border border-white/10 text-slate-400 hover:scale-105'
+                ? 'bg-[#2686F3] border border-[#79BEEE]/70 shadow-[0_0_14px_rgba(38,134,243,0.75)] hover:scale-105'
+                : 'bg-rose-500 border border-rose-400/70 shadow-[0_0_12px_rgba(244,63,94,0.45)] hover:scale-105'
             }`}
           >
             {updateInfo?.hasUpdate ? (
@@ -155,7 +155,7 @@ export const CalendarPage: React.FC = () => {
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-white" />
               </>
             ) : (
-              <RefreshCw size={15} className={checkingUpdate ? 'animate-spin text-[#2686F3]' : ''} />
+              <RefreshCw size={15} className={checkingUpdate ? 'animate-spin' : ''} />
             )}
           </button>
 
