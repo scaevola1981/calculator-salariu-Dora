@@ -47,6 +47,15 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       setProgress(0);
       setErrorMsg('');
 
+      if (updateInfo.otaUrl) {
+        await AppUpdater.applyOtaUpdate({
+          url: updateInfo.otaUrl,
+          version: updateInfo.latestVersion,
+        });
+        setStage('installing');
+        return;
+      }
+
       const result = await AppUpdater.downloadAndInstall({ url: updateInfo.downloadUrl });
       if (result.needsPermission) {
         setStage('needs_permission');

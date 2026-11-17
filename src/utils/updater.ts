@@ -1,10 +1,11 @@
 import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
 
-export const APP_VERSION = '1.0.6';
+export const APP_VERSION = '1.0.7';
 const GITHUB_LATEST_RELEASE_API =
   'https://api.github.com/repos/scaevola1981/calculator-salariu-Dora/releases/latest';
 
 export interface AppUpdaterPlugin {
+  applyOtaUpdate(options: { url: string; version: string }): Promise<{ updated?: boolean }>;
   downloadAndInstall(options: { url: string }): Promise<{ installed?: boolean; needsPermission?: boolean }>;
   installCachedApk(): Promise<{ installed?: boolean; needsPermission?: boolean }>;
   addListener(
@@ -19,6 +20,7 @@ export interface UpdateInfo {
   hasUpdate: boolean;
   latestVersion: string;
   downloadUrl: string;
+  otaUrl?: string;
   releaseNotes?: string;
 }
 
@@ -72,8 +74,9 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
       };
     }
 
-    // Find .apk asset in the release
+    // Find web-bundle.zip (OTA silent update) and .apk asset in the release
     const assets: Array<{ name: string; browser_download_url: string }> = data.assets || [];
+    const otaAsset = assets.find((a) => a.name.toLowerCase() === 'web-bundle.zip');
     const apkAsset = assets.find((a) => a.name.toLowerCase().endsWith('.apk'));
     const downloadUrl = apkAsset ? apkAsset.browser_download_url : data.html_url;
 
@@ -81,6 +84,7 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
       hasUpdate: true,
       latestVersion: latestTag.replace(/^v/i, ''),
       downloadUrl,
+      otaUrl: otaAsset ? otaAsset.browser_download_url : undefined,
       releaseNotes: data.body || undefined,
     };
   } catch {
