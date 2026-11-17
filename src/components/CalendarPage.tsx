@@ -1,0 +1,351 @@
+import React, { useState } from 'react';
+import { useWork } from '../context/WorkContext';
+import {
+  formatMinutesToHM,
+  formatMoney,
+  getMonthDisplayName,
+  formatDateKey,
+} from '../utils/timeFormat';
+import { DayEditModal } from './DayEditModal';
+import {
+  Coins,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Minus,
+  Sun,
+  Moon,
+} from 'lucide-react';
+
+export const CalendarPage: React.FC = () => {
+  const {
+    hourlyRate,
+    setHourlyRate,
+    workLogs,
+    selectedMonth,
+    setSelectedMonth,
+    selectedMonthDate,
+    totalMinutesMonth,
+    totalMoneyMonth,
+    daysWorkedMonth,
+    theme,
+    toggleTheme,
+  } = useWork();
+
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
+
+  // Sync rate input if external change
+  React.useEffect(() => {
+    setRateInputValue(String(hourlyRate));
+  }, [hourlyRate]);
+
+  const handleRateChange = (valStr: string) => {
+    setRateInputValue(valStr);
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setHourlyRate(parsed);
+    }
+  };
+
+  const handleRateStep = (delta: number) => {
+    const next = Math.max(0, Math.round((hourlyRate + delta) * 10) / 10);
+    setRateInputValue(String(next));
+    setHourlyRate(next);
+  };
+
+  // Build calendar matrix for selected month
+  const year = selectedMonthDate.getFullYear();
+  const month = selectedMonthDate.getMonth();
+  const monthName = getMonthDisplayName(year, month);
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sunday
+  // Convert to European Monday-first (0 = Monday, 6 = Sunday)
+  const startingDayIndex = (firstDayOfWeek + 6) % 7;
+
+  const todayKey = formatDateKey(new Date());
+
+  const weekDayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+
+  // Days slots
+  const calendarSlots: Array<{
+    dayNumber: number | null;
+    dateKey: string | null;
+    minutes: number;
+    isToday: boolean;
+    hasWork: boolean;
+    isLeave: boolean;
+  }> = [];
+
+  // Empty leading slots
+  for (let i = 0; i < startingDayIndex; i++) {
+    calendarSlots.push({
+      dayNumber: null,
+      dateKey: null,
+      minutes: 0,
+      isToday: false,
+      hasWork: false,
+      isLeave: false,
+    });
+  }
+
+  // Days of the month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const log = workLogs[dateKey];
+    const mins = log ? log.totalMinutes : 0;
+
+    calendarSlots.push({
+      dayNumber: d,
+      dateKey,
+      minutes: mins,
+      isToday: dateKey === todayKey,
+      hasWork: mins > 0,
+      isLeave: Boolean(log?.isLeave),
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4 pb-28">
+      {/* Page Title & Theme Toggle */}
+      <div className="pt-1 flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold text-white tracking-tight">
+          Calendar & Tarif Orar
+        </h1>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Schimbă la tema albă' : 'Schimbă la tema întunecată'}
+          title={theme === 'dark' ? 'Temă Albă' : 'Temă Întunecată'}
+          className="glass-pill w-9 h-9 flex items-center justify-center border border-white/10 text-amber-300 hover:scale-105 active:scale-95 transition-all"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} className="text-sky-600" />}
+        </button>
+      </div>
+
+      {/* SECTION 1: Tarif Orar Input Card */}
+      <div className="glass-card p-4 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center text-emerald-400">
+              <Coins size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white">Tarif pe Oră</h2>
+            </div>
+          </div>
+
+          <span className="text-xs font-mono-num font-extrabold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+            {hourlyRate} € / oră
+          </span>
+        </div>
+
+        {/* Tactile input row with step buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleRateStep(-1)}
+            className="w-11 h-11 neo-button text-white rounded-xl flex-shrink-0"
+            title="Scade cu 1 €"
+          >
+            <Minus size={18} strokeWidth={2.5} />
+          </button>
+
+          <div className="relative flex-1">
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={rateInputValue}
+              onChange={(e) => handleRateChange(e.target.value)}
+              className="neo-input-inset w-full text-center pr-12 text-xl"
+              placeholder="0"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
+              €/h
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleRateStep(1)}
+            className="w-11 h-11 neo-button text-white rounded-xl flex-shrink-0"
+            title="Crește cu 1 €"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+
+      {/* SECTION 2: Monthly Calendar Card */}
+      <div className="glass-card p-3.5 flex flex-col gap-2">
+        {/* Month Navigation (Only Current vs Previous Month) */}
+        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+          <button
+            type="button"
+            onClick={() => setSelectedMonth('previous')}
+            disabled={selectedMonth === 'previous'}
+            className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all ${
+              selectedMonth === 'previous'
+                ? 'opacity-30 cursor-not-allowed text-slate-500'
+                : 'text-sky-300 hover:bg-white/5 active:scale-95'
+            }`}
+          >
+            <ChevronLeft size={16} />
+            <span>Luna trecută</span>
+          </button>
+
+          <div className="text-center">
+            <h3 className="text-base font-extrabold text-white capitalize tracking-tight">
+              {monthName}
+            </h3>
+            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider block">
+              {selectedMonth === 'current' ? 'Luna curentă' : 'Luna precedentă'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedMonth('current')}
+            disabled={selectedMonth === 'current'}
+            className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all ${
+              selectedMonth === 'current'
+                ? 'opacity-30 cursor-not-allowed text-slate-500'
+                : 'text-sky-300 hover:bg-white/5 active:scale-95'
+            }`}
+          >
+            <span>Luna curentă</span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Days of week header */}
+        <div className="grid grid-cols-7 gap-1 text-center py-0.5">
+          {weekDayLabels.map((lbl, idx) => (
+            <span
+              key={idx}
+              className={`text-[10px] font-extrabold uppercase ${
+                idx >= 5 ? 'text-amber-400/70' : 'text-slate-400'
+              }`}
+            >
+              {lbl}
+            </span>
+          ))}
+        </div>
+
+        {/* Calendar Days Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {calendarSlots.map((slot, idx) => {
+            if (slot.dayNumber === null) {
+              return <div key={`empty_${idx}`} className="aspect-square rounded-xl" />;
+            }
+
+            const formattedHours = Number((slot.minutes / 60).toFixed(1));
+
+            return (
+              <button
+                key={slot.dateKey}
+                type="button"
+                onClick={() => setSelectedDayKey(slot.dateKey)}
+                className={`aspect-square rounded-xl p-1 flex flex-col justify-between items-center transition-all cursor-pointer relative group ${
+                  slot.isLeave
+                    ? 'calendar-day-leave bg-gradient-to-br from-amber-500 to-orange-500 border border-amber-400 shadow-[0_3px_10px_rgba(245,158,11,0.35)]'
+                    : slot.hasWork
+                    ? 'calendar-day-worked bg-gradient-to-br from-[#2686F3] to-[#1a6dd1] border border-[#79BEEE]/60 shadow-[0_3px_10px_rgba(38,134,243,0.4)]'
+                    : 'bg-slate-900/40 border border-white/5 hover:bg-slate-800/40'
+                } ${
+                  slot.isToday ? 'ring-2 ring-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.5)]' : ''
+                }`}
+              >
+                {/* Day number */}
+                <div className="w-full flex justify-between items-center px-0.5 leading-none">
+                  <span
+                    className={`text-[11px] font-mono-num font-bold leading-none ${
+                      slot.isLeave || slot.hasWork
+                        ? 'text-white'
+                        : slot.isToday
+                        ? 'text-sky-300 font-extrabold'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {slot.dayNumber}
+                  </span>
+
+                  {slot.isToday && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        slot.isLeave || slot.hasWork ? 'bg-white' : 'bg-sky-400'
+                      }`}
+                    />
+                  )}
+                </div>
+
+                {/* Hours Worked / Leave badge */}
+                {slot.isLeave ? (
+                  <div className="w-full bg-black/20 rounded-md py-[1px] px-0.5 text-center border border-white/25">
+                    <span className="text-[8.5px] font-mono-num font-extrabold text-white block leading-tight">
+                      {slot.minutes > 0 ? `CO ${formattedHours}h` : 'CO'}
+                    </span>
+                  </div>
+                ) : slot.hasWork ? (
+                  <div className="w-full bg-white/20 rounded-md py-[1px] px-0.5 text-center border border-white/30">
+                    <span className="text-[9px] font-mono-num font-extrabold text-white block leading-tight">
+                      {formattedHours}h
+                    </span>
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Calendar Footer Info */}
+        <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-md bg-gradient-to-br from-sky-500 to-blue-600 inline-block" />
+              <span>Lucrat</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-md bg-gradient-to-br from-amber-500 to-orange-500 inline-block" />
+              <span>Concediu</span>
+            </div>
+          </div>
+          <span className="font-mono-num font-semibold text-slate-300">
+            {daysWorkedMonth} {daysWorkedMonth === 1 ? 'zi' : 'zile'}
+          </span>
+        </div>
+      </div>
+
+      {/* Selected Month Recap Strip */}
+      <div className="glass-card p-3.5 flex items-center justify-between text-xs">
+        <div>
+          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+            Total {monthName}
+          </span>
+          <span className="text-base font-extrabold text-white font-mono-num">
+            {formatMinutesToHM(totalMinutesMonth)}
+          </span>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] uppercase font-bold text-slate-400 block">
+            Venit estimat
+          </span>
+          <span className="text-base font-extrabold text-emerald-400 font-mono-num">
+            {formatMoney(totalMoneyMonth)}
+          </span>
+        </div>
+      </div>
+
+      {/* Day Edit Modal when a day is tapped */}
+      {selectedDayKey && (
+        <DayEditModal
+          dateKey={selectedDayKey}
+          onClose={() => setSelectedDayKey(null)}
+        />
+      )}
+    </div>
+  );
+};
+
