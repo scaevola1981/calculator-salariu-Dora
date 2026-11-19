@@ -8,7 +8,6 @@ import {
   MONTH_NAMES_SHORT_RO,
 } from '../utils/timeFormat';
 import { DayEditModal } from './DayEditModal';
-import { UpdateModal } from './UpdateModal';
 import {
   Coins,
   ChevronLeft,
@@ -43,25 +42,25 @@ export const CalendarPage: React.FC = () => {
     updateInfo,
     checkingUpdate,
     recheckUpdate,
+    openUpdatePrompt,
     userName,
     setUserName,
     importBackup,
   } = useWork();
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
-  const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
   const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleUpdateButtonClick = async () => {
     if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
-      setShowUpdateModal(true);
+      openUpdatePrompt();
       return;
     }
-    const info = await recheckUpdate();
+    const info = await recheckUpdate(true);
     if (info?.hasUpdate && info.downloadUrl) {
-      setShowUpdateModal(true);
+      openUpdatePrompt();
     }
   };
 
@@ -561,14 +560,6 @@ export const CalendarPage: React.FC = () => {
         <DayEditModal
           dateKey={selectedDayKey}
           onClose={() => setSelectedDayKey(null)}
-        />
-      )}
-
-      {/* In-App Update Modal */}
-      {showUpdateModal && updateInfo?.hasUpdate && (
-        <UpdateModal
-          updateInfo={updateInfo}
-          onClose={() => setShowUpdateModal(false)}
         />
       )}
     </div>

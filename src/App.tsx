@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { CalendarPage } from './components/CalendarPage';
 import { NavBar } from './components/NavBar';
 import { OnboardingModal } from './components/OnboardingModal';
+import { UpdateModal } from './components/UpdateModal';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { formatMinutesToHM, formatMoney } from './utils/timeFormat';
 import { CheckCircle2, PlayCircle, X } from 'lucide-react';
@@ -16,8 +17,15 @@ const AppContent: React.FC = () => {
     date: string;
   } | null>(null);
 
-  const { hourlyRate, theme, isOnboarded, userName, autoUpdateProgress, autoUpdateVersion } =
-    useWork();
+  const {
+    hourlyRate,
+    theme,
+    isOnboarded,
+    userName,
+    updateInfo,
+    updatePromptOpen,
+    dismissUpdatePrompt,
+  } = useWork();
 
   // Configure native Android status bar based on theme
   useEffect(() => {
@@ -59,47 +67,12 @@ const AppContent: React.FC = () => {
       {/* First-install animated Onboarding */}
       {!isOnboarded && <OnboardingModal />}
 
-      {/* Zero-Click Automatic OTA Update Overlay */}
-      {autoUpdateProgress !== null && (
-        <div
-          className="fixed inset-0 z-[6000] flex flex-col items-center justify-center px-6"
-          style={{
-            background: 'rgba(0, 0, 0, 0.72)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-          }}
-        >
-          <div className="glass-card w-full max-w-xs p-6 flex flex-col items-center gap-4 text-center animate-pop-spring border border-[#2686F3]/40">
-            <img
-              src="/logo.png"
-              alt="Logo Contor Ore Dora"
-              className="w-16 h-16 object-contain animate-float-logo drop-shadow-[0_8px_18px_rgba(38,134,243,0.45)]"
-            />
-            <div>
-              <h3 className="text-base font-extrabold text-white">
-                Se actualizează aplicația...
-              </h3>
-              {autoUpdateVersion && (
-                <span className="text-xs font-mono-num font-bold text-[#79BEEE]">
-                  Versiunea {autoUpdateVersion}
-                </span>
-              )}
-            </div>
-
-            <div className="w-full flex flex-col gap-1.5">
-              <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden border border-white/15">
-                <div
-                  className="h-full bg-gradient-to-r from-[#2686F3] to-[#79BEEE] transition-all duration-150 rounded-full"
-                  style={{ width: `${Math.max(6, autoUpdateProgress)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-mono-num text-slate-300">
-                <span>Te rugăm așteaptă...</span>
-                <span className="font-bold text-[#79BEEE]">{autoUpdateProgress}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Automatic Update Prompt Modal (Actualizează / Mai târziu) */}
+      {isOnboarded && updatePromptOpen && updateInfo?.hasUpdate && (
+        <UpdateModal
+          updateInfo={updateInfo}
+          onClose={dismissUpdatePrompt}
+        />
       )}
 
       {/* Top Safe Area Spacing */}

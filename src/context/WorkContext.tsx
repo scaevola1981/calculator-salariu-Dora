@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { WorkLogs, ActiveShift, MonthViewType, WorkSession } from '../types';
 import {
   loadWorkLogs,
@@ -18,9 +18,8 @@ import {
   getMonthKey,
   getActiveMonthKeys,
 } from '../utils/timeFormat';
-import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { triggerHaptic } from '../utils/haptics';
-import { checkForAppUpdate, AppUpdater, UpdateInfo } from '../utils/updater';
+import { checkForAppUpdate, UpdateInfo } from '../utils/updater';
 import { startShiftNotification, stopShiftNotification } from '../utils/shiftNotification';
 
 interface DailyBarData {
@@ -67,9 +66,10 @@ interface WorkContextType {
   // App Updater
   updateInfo: UpdateInfo | null;
   checkingUpdate: boolean;
-  recheckUpdate: () => Promise<UpdateInfo | null>;
-  autoUpdateProgress: number | null;
-  autoUpdateVersion: string | null;
+  recheckUpdate: (force?: boolean) => Promise<UpdateInfo | null>;
+  updatePromptOpen: boolean;
+  openUpdatePrompt: () => void;
+  dismissUpdatePrompt: () => void;
 }
 
 const WorkContext = createContext<WorkContextType | undefined>(undefined);
@@ -87,63 +87,63 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isOnboarded, setIsOnboarded] = useState<boolean>(() => loadOnboarded());
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
-  const [autoUpdateProgress, setAutoUpdateProgress] = useState<number | null>(null);
-  const [autoUpdateVersion, setAutoUpdateVersion] = useState<string | null>(null);
+  const [updatePromptOpen, setUpdatePromptOpen] = useState<boolean>(false);
+  const dismissedVersionRef = useRef<string | null>(null);
+  const lastCheckTsRef = useRef<number>(0);
 
-  const recheckUpdate = useCallback(async () => {
+  const recheckUpdate = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastCheckTsRef.current < 15000) {
+      return null;
+    }
+    lastCheckTsRef.current = now;
     setCheckingUpdate(true);
     const info = await checkForAppUpdate();
     setCheckingUpdate(false);
     if (info) {
       setUpdateInfo(info);
+      if (info.hasUpdate && dismissedVersionRef.current !== info.latestVersion) {
+        setUpdatePromptOpen(true);
+      }
     }
     return info;
   }, []);
 
-  // Automatically check and apply OTA web-bundle updates on startup (zero user steps!)
+  const openUpdatePrompt = useCallback(() => {
+    setUpdatePromptOpen(true);
+  }, []);
+
+  const dismissUpdatePrompt = useCallback(() => {
+    setUpdatePromptOpen(false);
+    if (updateInfo?.latestVersion) {
+      dismissedVersionRef.current = updateInfo.latestVersion;
+    }
+  }, [updateInfo]);
+
+  // Check for updates automatically on mount, app resume (visibilitychange/focus), and every 5 min
   useEffect(() => {
-    let listener: PluginListenerHandle | null = null;
-    let cancelled = false;
+    recheckUpdate(true);
 
-    const runAutoUpdate = async () => {
-      const info = await recheckUpdate();
-      if (cancelled || !info || !info.hasUpdate || !info.otaUrl) return;
-      if (!Capacitor.isNativePlatform()) return;
-
-      try {
-        setAutoUpdateVersion(info.latestVersion);
-        setAutoUpdateProgress(0);
-
-        listener = await AppUpdater.addListener('downloadProgress', (data) => {
-          if (!cancelled) {
-            setAutoUpdateProgress(data.progress);
-          }
-        });
-
-        await AppUpdater.applyOtaUpdate({
-          url: info.otaUrl,
-          version: info.latestVersion,
-        });
-      } catch {
-        // Silent fallback if connection drops: app remains fully usable offline
-        if (!cancelled) {
-          setAutoUpdateProgress(null);
-          setAutoUpdateVersion(null);
-        }
-      } finally {
-        if (listener) {
-          listener.remove();
-        }
+    const handleResume = () => {
+      if (document.visibilityState === 'visible') {
+        recheckUpdate(false);
       }
     };
 
-    runAutoUpdate();
+    const handleFocus = () => {
+      recheckUpdate(false);
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('focus', handleFocus);
+    const interval = setInterval(() => {
+      recheckUpdate(false);
+    }, 5 * 60 * 1000);
 
     return () => {
-      cancelled = true;
-      if (listener) {
-        listener.remove();
-      }
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
     };
   }, [recheckUpdate]);
 
@@ -606,8 +606,9 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateInfo,
     checkingUpdate,
     recheckUpdate,
-    autoUpdateProgress,
-    autoUpdateVersion,
+    updatePromptOpen,
+    openUpdatePrompt,
+    dismissUpdatePrompt,
   };
 
   return <WorkContext.Provider value={value}>{children}</WorkContext.Provider>;

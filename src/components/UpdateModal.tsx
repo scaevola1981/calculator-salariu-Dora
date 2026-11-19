@@ -141,16 +141,25 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           {stage === 'ready' && (
             <div className="flex flex-col gap-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Aplicația se va descărca și actualiza direct aici, fără a deschide browserul telefonului. Datele și orele tale rămân intacte.
+                Există o versiune nouă disponibilă. Actualizarea se face automat în aplicație, iar datele și orele tale rămân intacte.
               </p>
-              <button
-                type="button"
-                onClick={handleStartUpdate}
-                className="neo-button w-full py-3.5 text-sm font-extrabold text-white flex items-center justify-center gap-2"
-              >
-                <Download size={18} />
-                <span>Descarcă și Instalează v{updateInfo.latestVersion}</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="glass-pill py-3 text-xs font-bold text-slate-300 hover:text-white active:scale-95 transition-all border border-white/15"
+                >
+                  Mai târziu
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartUpdate}
+                  className="neo-button py-3 text-xs font-extrabold text-white flex items-center justify-center gap-1.5"
+                >
+                  <Download size={16} />
+                  <span>Actualizează</span>
+                </button>
+              </div>
             </div>
           )}
 
