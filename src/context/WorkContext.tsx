@@ -18,8 +18,9 @@ import {
   getMonthKey,
   getActiveMonthKeys,
 } from '../utils/timeFormat';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { triggerHaptic } from '../utils/haptics';
-import { checkForAppUpdate, UpdateInfo } from '../utils/updater';
+import { checkForAppUpdate, AppUpdater, UpdateInfo } from '../utils/updater';
 
 interface DailyBarData {
   day: number;
@@ -65,6 +66,8 @@ interface WorkContextType {
   updateInfo: UpdateInfo | null;
   checkingUpdate: boolean;
   recheckUpdate: () => Promise<UpdateInfo | null>;
+  autoUpdateProgress: number | null;
+  autoUpdateVersion: string | null;
 }
 
 const WorkContext = createContext<WorkContextType | undefined>(undefined);
@@ -82,6 +85,8 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isOnboarded, setIsOnboarded] = useState<boolean>(() => loadOnboarded());
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+  const [autoUpdateProgress, setAutoUpdateProgress] = useState<number | null>(null);
+  const [autoUpdateVersion, setAutoUpdateVersion] = useState<string | null>(null);
 
   const recheckUpdate = useCallback(async () => {
     setCheckingUpdate(true);
@@ -93,8 +98,51 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return info;
   }, []);
 
+  // Automatically check and apply OTA web-bundle updates on startup (zero user steps!)
   useEffect(() => {
-    recheckUpdate();
+    let listener: PluginListenerHandle | null = null;
+    let cancelled = false;
+
+    const runAutoUpdate = async () => {
+      const info = await recheckUpdate();
+      if (cancelled || !info || !info.hasUpdate || !info.otaUrl) return;
+      if (!Capacitor.isNativePlatform()) return;
+
+      try {
+        setAutoUpdateVersion(info.latestVersion);
+        setAutoUpdateProgress(0);
+
+        listener = await AppUpdater.addListener('downloadProgress', (data) => {
+          if (!cancelled) {
+            setAutoUpdateProgress(data.progress);
+          }
+        });
+
+        await AppUpdater.applyOtaUpdate({
+          url: info.otaUrl,
+          version: info.latestVersion,
+        });
+      } catch {
+        // Silent fallback if connection drops: app remains fully usable offline
+        if (!cancelled) {
+          setAutoUpdateProgress(null);
+          setAutoUpdateVersion(null);
+        }
+      } finally {
+        if (listener) {
+          listener.remove();
+        }
+      }
+    };
+
+    runAutoUpdate();
+
+    return () => {
+      cancelled = true;
+      if (listener) {
+        listener.remove();
+      }
+    };
   }, [recheckUpdate]);
 
   const setUserName = useCallback((name: string) => {
@@ -527,6 +575,8 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateInfo,
     checkingUpdate,
     recheckUpdate,
+    autoUpdateProgress,
+    autoUpdateVersion,
   };
 
   return <WorkContext.Provider value={value}>{children}</WorkContext.Provider>;
