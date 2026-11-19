@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useWork } from '../context/WorkContext';
 import {
   formatMinutesToHM,
   formatMoney,
   getMonthDisplayName,
   formatDateKey,
+  MONTH_NAMES_SHORT_RO,
 } from '../utils/timeFormat';
 import { DayEditModal } from './DayEditModal';
 import { UpdateModal } from './UpdateModal';
@@ -18,6 +19,10 @@ import {
   Moon,
   RefreshCw,
   Download,
+  User,
+  Share2,
+  Upload,
+  FileDown,
 } from 'lucide-react';
 import { APP_VERSION } from '../utils/updater';
 
@@ -32,16 +37,22 @@ export const CalendarPage: React.FC = () => {
     totalMinutesMonth,
     totalMoneyMonth,
     daysWorkedMonth,
+    dailyBarsData,
     theme,
     toggleTheme,
     updateInfo,
     checkingUpdate,
     recheckUpdate,
+    userName,
+    setUserName,
+    importBackup,
   } = useWork();
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
   const [rateInputValue, setRateInputValue] = useState<string>(String(hourlyRate));
+  const [backupNotice, setBackupNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleUpdateButtonClick = async () => {
     if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
@@ -71,6 +82,102 @@ export const CalendarPage: React.FC = () => {
     const next = Math.max(0, Math.round((hourlyRate + delta) * 10) / 10);
     setRateInputValue(String(next));
     setHourlyRate(next);
+  };
+
+  const showTempNotice = (msg: string) => {
+    setBackupNotice(msg);
+    setTimeout(() => setBackupNotice(null), 3500);
+  };
+
+  const handleShareWhatsApp = () => {
+    const monthShort = MONTH_NAMES_SHORT_RO[selectedMonthDate.getMonth()];
+    const displayMonth = getMonthDisplayName(
+      selectedMonthDate.getFullYear(),
+      selectedMonthDate.getMonth()
+    );
+    const activeDays = dailyBarsData.filter((b) => b.minutes > 0 || b.isLeave);
+
+    const lines: string[] = [
+      `📊 Raport Pontaj — ${displayMonth}${userName ? ` (${userName})` : ''}`,
+      '────────────────────',
+    ];
+
+    if (activeDays.length === 0) {
+      lines.push('Nicio zi lucrată în această lună.');
+    } else {
+      for (const bar of activeDays) {
+        const dayStr = `${String(bar.day).padStart(2, '0')} ${monthShort} (${bar.dayOfWeek})`;
+        if (bar.isLeave && bar.minutes === 0) {
+          lines.push(`• ${dayStr}: Concediu (CO)`);
+        } else {
+          const money = Math.round(((bar.minutes / 60) * hourlyRate) * 100) / 100;
+          const leaveTag = bar.isLeave ? ' [CO]' : '';
+          lines.push(`• ${dayStr}${leaveTag}: ${formatMinutesToHM(bar.minutes)} — ${formatMoney(money)}`);
+        }
+      }
+    }
+
+    lines.push('────────────────────');
+    lines.push(`⏱️ Total Ore: ${formatMinutesToHM(totalMinutesMonth)} (${daysWorkedMonth} zile)`);
+    lines.push(`💰 Tarif: ${hourlyRate} €/h`);
+    lines.push(`✅ TOTAL: ${formatMoney(totalMoneyMonth)}`);
+
+    const reportText = lines.join('\n');
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(reportText)}`;
+    window.open(waUrl, '_system');
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const payload = {
+        app: 'Contor Ore Dora',
+        version: APP_VERSION,
+        exportedAt: new Date().toISOString(),
+        userName,
+        hourlyRate,
+        workLogs,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-contor-ore-${formatDateKey(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showTempNotice('Backup JSON salvat!');
+    } catch {
+      showTempNotice('Eroare la exportul backup-ului.');
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || '{}'));
+        if (!parsed || typeof parsed !== 'object') {
+          showTempNotice('Fișier backup invalid.');
+          return;
+        }
+        importBackup({
+          userName: typeof parsed.userName === 'string' ? parsed.userName : undefined,
+          hourlyRate: typeof parsed.hourlyRate === 'number' ? parsed.hourlyRate : undefined,
+          workLogs: parsed.workLogs && typeof parsed.workLogs === 'object' ? parsed.workLogs : undefined,
+        });
+        showTempNotice('Backup restaurat cu succes!');
+      } catch {
+        showTempNotice('Nu s-a putut citi fișierul JSON.');
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Build calendar matrix for selected month
@@ -227,6 +334,20 @@ export const CalendarPage: React.FC = () => {
           >
             <Plus size={18} strokeWidth={2.5} />
           </button>
+        </div>
+
+        {/* Compact Name Editor */}
+        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-[#2686F3]/15 border border-[#2686F3]/30 flex items-center justify-center text-[#2686F3] flex-shrink-0">
+            <User size={14} />
+          </div>
+          <input
+            type="text"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            placeholder="Numele tău (ex. Dora)"
+            className="neo-input-inset flex-1 text-sm font-semibold py-1.5 px-3"
+          />
         </div>
       </div>
 
@@ -388,6 +509,51 @@ export const CalendarPage: React.FC = () => {
             {formatMoney(totalMoneyMonth)}
           </span>
         </div>
+      </div>
+
+      {/* SECTION 3: Raport WhatsApp & Backup Date */}
+      <div className="glass-card p-3.5 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={handleShareWhatsApp}
+          className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-all !text-white font-bold text-xs flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(16,185,129,0.35)]"
+        >
+          <Share2 size={15} />
+          <span>Trimite Raportul ({monthName}) pe WhatsApp</span>
+        </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleExportBackup}
+            className="glass-pill py-2 px-3 text-[11px] font-bold text-sky-300 flex items-center justify-center gap-1.5 border border-[#2686F3]/30 active:scale-95 transition-all"
+          >
+            <FileDown size={14} />
+            <span>Export Backup</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="glass-pill py-2 px-3 text-[11px] font-bold text-sky-300 flex items-center justify-center gap-1.5 border border-[#2686F3]/30 active:scale-95 transition-all"
+          >
+            <Upload size={14} />
+            <span>Import Backup</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+        </div>
+
+        {backupNotice && (
+          <div className="text-center text-[11px] font-bold text-emerald-400">
+            {backupNotice}
+          </div>
+        )}
       </div>
 
       {/* Day Edit Modal when a day is tapped */}

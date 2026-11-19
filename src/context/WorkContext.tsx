@@ -21,6 +21,7 @@ import {
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { triggerHaptic } from '../utils/haptics';
 import { checkForAppUpdate, AppUpdater, UpdateInfo } from '../utils/updater';
+import { startShiftNotification, stopShiftNotification } from '../utils/shiftNotification';
 
 interface DailyBarData {
   day: number;
@@ -49,6 +50,7 @@ interface WorkContextType {
   addManualSession: (dateKey: string, durationMinutes: number, note?: string, startTs?: number, endTs?: number) => void;
   deleteSession: (dateKey: string, sessionId: string) => void;
   clearDayLog: (dateKey: string) => void;
+  importBackup: (data: { userName?: string; hourlyRate?: number; workLogs?: WorkLogs }) => void;
   // Computed stats for selected month
   totalMinutesMonth: number;
   totalMoneyMonth: number;
@@ -240,6 +242,13 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => clearInterval(cleanupInterval);
   }, []);
 
+  // Sync persistent Android notification if shift is active
+  useEffect(() => {
+    if (activeShift?.isRunning) {
+      startShiftNotification(activeShift.startTime, userName);
+    }
+  }, [activeShift, userName]);
+
   // Start shift
   const startShift = useCallback(() => {
     const now = Date.now();
@@ -256,8 +265,9 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setActiveShiftState(newShift);
     saveActiveShift(newShift);
+    startShiftNotification(now, userName);
     triggerHaptic('heavy');
-  }, []);
+  }, [userName]);
 
   // Stop shift
   const stopShift = useCallback(() => {
@@ -306,6 +316,7 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveShiftState(null);
     saveActiveShift(null);
     setElapsedMs(0);
+    stopShiftNotification();
     triggerHaptic('success');
 
     return { durationMinutes, date: todayKey };
@@ -482,6 +493,25 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     triggerHaptic('warning');
   }, [updateWorkLogs]);
 
+  // Import backup JSON safely
+  const importBackup = useCallback(
+    (data: { userName?: string; hourlyRate?: number; workLogs?: WorkLogs }) => {
+      if (typeof data.userName === 'string') {
+        setUserName(data.userName);
+      }
+      if (typeof data.hourlyRate === 'number' && !isNaN(data.hourlyRate) && data.hourlyRate >= 0) {
+        setHourlyRate(data.hourlyRate);
+      }
+      if (data.workLogs && typeof data.workLogs === 'object') {
+        const { cleaned } = cleanOldLogs(data.workLogs);
+        setWorkLogsState(cleaned);
+        saveWorkLogs(cleaned);
+      }
+      triggerHaptic('success');
+    },
+    [setUserName, setHourlyRate]
+  );
+
   // Selected month date representation
   const selectedMonthDate = useMemo(() => {
     const now = new Date();
@@ -562,6 +592,7 @@ export const WorkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addManualSession,
     deleteSession,
     clearDayLog,
+    importBackup,
     totalMinutesMonth,
     totalMoneyMonth,
     daysWorkedMonth,

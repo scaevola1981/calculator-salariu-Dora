@@ -219,12 +219,23 @@ public class AppUpdaterPlugin extends Plugin {
         launchInstall(apkFile, call);
     }
 
+    private boolean isAllowedDownloadUrl(String url) {
+        if (url == null) return false;
+        String lower = url.toLowerCase();
+        return lower.startsWith("https://github.com/scaevola1981/calculator-salariu-dora/")
+                || lower.startsWith("https://objects.githubusercontent.com/")
+                || lower.startsWith("https://release-assets.githubusercontent.com/");
+    }
+
     private HttpURLConnection openConnectionFollowingRedirects(String urlString) throws Exception {
         String currentUrl = urlString;
         int redirects = 0;
         HttpURLConnection connection = null;
 
         while (redirects < 6) {
+            if (!isAllowedDownloadUrl(currentUrl)) {
+                throw new SecurityException("Domeniu neautorizat pentru actualizare: " + currentUrl);
+            }
             URL url = new URL(currentUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setInstanceFollowRedirects(false);
