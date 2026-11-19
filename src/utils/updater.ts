@@ -1,6 +1,6 @@
 import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
 
-export const APP_VERSION = '1.0.9';
+export const APP_VERSION = '1.0.10';
 const GITHUB_LATEST_RELEASE_API =
   'https://api.github.com/repos/scaevola1981/calculator-salariu-Dora/releases/latest';
 

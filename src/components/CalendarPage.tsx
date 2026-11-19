@@ -130,7 +130,7 @@ export const CalendarPage: React.FC = () => {
       {/* Page Title & Header Controls */}
       <div className="pt-1 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-white tracking-tight">
-          Calendar & Tarif Orar
+          Calendar
         </h1>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
@@ -147,10 +147,10 @@ export const CalendarPage: React.FC = () => {
                 ? `Update nou v${updateInfo.latestVersion}! Apasă pentru actualizare`
                 : `Verifică update (v${APP_VERSION})`
             }
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 !text-white ${
+            className={`relative w-[42px] h-9 rounded-full flex items-center justify-center transition-all active:scale-95 !text-white ${
               updateInfo?.hasUpdate
-                ? 'bg-[#2686F3] border border-[#79BEEE]/70 shadow-[0_0_14px_rgba(38,134,243,0.75)] hover:scale-105'
-                : 'bg-rose-500 border border-rose-400/70 shadow-[0_0_12px_rgba(244,63,94,0.45)] hover:scale-105'
+                ? 'bg-rose-500 border border-rose-400/70 shadow-[0_0_14px_rgba(244,63,94,0.75)] hover:scale-105'
+                : 'bg-[#2686F3] border border-[#79BEEE]/70 shadow-[0_0_12px_rgba(38,134,243,0.45)] hover:scale-105'
             }`}
           >
             {updateInfo?.hasUpdate ? (
